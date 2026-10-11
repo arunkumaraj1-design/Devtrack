@@ -1,0 +1,72 @@
+{
+  "info": {
+    "name": "DevTrack API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Create Reporter",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"id\": 1,\n  \"name\": \"Alice Example\",\n  \"email\": \"alice@example.com\",\n  \"team\": \"backend\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8000/api/reporters/",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8000",
+          "path": ["api", "reporters", ""]
+        }
+      }
+    },
+    {
+      "name": "Create Critical Issue",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"id\": 1,\n  \"title\": \"Login button not working on mobile\",\n  \"description\": \"Users on iOS 17 cannot tap the login button\",\n  \"status\": \"open\",\n  \"priority\": \"critical\",\n  \"reporter_id\": 1\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8000/api/issues/",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8000",
+          "path": ["api", "issues", ""]
+        }
+      }
+    },
+    {
+      "name": "Get Issue By ID",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "http://localhost:8000/api/issues/?id=1",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8000",
+          "path": ["api", "issues", ""],
+          "query": [{ "key": "id", "value": "1" }]
+        }
+      }
+    },
+    {
+      "name": "Get Issues By Status",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "http://localhost:8000/api/issues/?status=open",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8000",
+          "path": ["api", "issues", ""],
+          "query": [{ "key": "status", "value": "open" }]
+        }
+      }
+    }
+  ]
+}
