@@ -1,4 +1,4 @@
-# DevTrack (minimal)
+# DevTrack 
 
 This is a minimal Django backend API for tracking engineering issues.
 
