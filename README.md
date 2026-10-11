@@ -34,9 +34,14 @@ Postman collection:
 - A ready-to-import Postman collection is included at `postman_collection.json`.
 
 Example responses and screenshots:
-- Save at least two screenshots (one success, one failure) into `postman_screenshots/` and reference them here. Example filenames:
-	- `postman_screenshots/create_issue_success.png`
-	- `postman_screenshots/create_issue_failure.png`
+
+Success (201 Created):
+
+![Postman Desktop success response](postman_screenshots/create_issue_success.png)
+
+Validation failure (400 Bad Request):
+
+![Postman Desktop validation failure response](postman_screenshots/create_issue_failure.png)
 
 How to capture screenshots:
 1. Import `postman_collection.json` into Postman.
