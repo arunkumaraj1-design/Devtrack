@@ -71,3 +71,23 @@ And an example validation error response:
 ```
 { "error": "Title cannot be empty" }
 ```
+
+Quick curl examples
+1) Create a reporter:
+
+```bash
+curl -X POST http://localhost:8000/api/reporters/ \
+	-H "Content-Type: application/json" \
+	-d '{"id":1,"name":"Alice","email":"alice@example.com","team":"backend"}'
+```
+
+2) Create an issue:
+
+```bash
+curl -X POST http://localhost:8000/api/issues/ \
+	-H "Content-Type: application/json" \
+	-d '{"id":1,"title":"Login bug","description":"...","status":"open","priority":"critical","reporter_id":1}'
+```
+
+Create Pull Request
+- I pushed these changes to a branch `ci-readme-improvements`. Open this URL in your browser to create a PR: https://github.com/arunkumaraj1-design/Devtrack/compare/main...ci-readme-improvements?expand=1
