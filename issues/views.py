@@ -1,101 +1,191 @@
 import json
 import os
-from django.http import JsonResponse, HttpResponseNotAllowed
-from .models import Reporter, Issue, CriticalIssue, LowPriorityIssue
+from pathlib import Path
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-REPORTERS_FILE = os.path.join(BASE_DIR, 'reporters.json')
-ISSUES_FILE = os.path.join(BASE_DIR, 'issues.json')
+from django.http import JsonResponse
+
+from .models import CriticalIssue, Issue, LowPriorityIssue, Reporter
+
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+REPORTERS_FILE = BASE_DIR / 'reporters.json'
+ISSUES_FILE = BASE_DIR / 'issues.json'
+
+
+class StorageError(Exception):
+    """Raised when a JSON data file cannot be read or written safely."""
 
 
 def _load(file_path):
-    if not os.path.exists(file_path):
+    if not file_path.exists():
         return []
-    with open(file_path, 'r') as f:
+    try:
+        with file_path.open('r', encoding='utf-8') as data_file:
+            records = json.load(data_file)
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise StorageError('Data store is unavailable or contains invalid JSON') from exc
+    if not isinstance(records, list) or any(not isinstance(record, dict) for record in records):
+        raise StorageError('Data store must contain a JSON list of records')
+    return records
+
+
+def _save(file_path, records):
+    temporary_path = file_path.with_name(f'.{file_path.name}.{os.getpid()}.tmp')
+    try:
+        with temporary_path.open('w', encoding='utf-8') as data_file:
+            json.dump(records, data_file, indent=2, ensure_ascii=False)
+            data_file.flush()
+            os.fsync(data_file.fileno())
+        os.replace(temporary_path, file_path)
+    except OSError as exc:
         try:
-            return json.load(f)
-        except Exception:
-            return []
+            temporary_path.unlink(missing_ok=True)
+        except OSError:
+            pass
+        raise StorageError('Data store could not be saved') from exc
 
 
-def _save(file_path, data):
-    with open(file_path, 'w') as f:
-        json.dump(data, f, indent=2)
+def _json_body(request):
+    try:
+        payload = json.loads(request.body.decode('utf-8'))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return None, JsonResponse({'error': 'Invalid JSON'}, status=400)
+    if not isinstance(payload, dict):
+        return None, JsonResponse({'error': 'JSON body must be an object'}, status=400)
+    return payload, None
+
+
+def _next_id(records):
+    existing_ids = [record.get('id') for record in records if isinstance(record.get('id'), int)]
+    return max(existing_ids, default=0) + 1
+
+
+def _query_id(value):
+    try:
+        record_id = int(value)
+    except (TypeError, ValueError):
+        return None
+    return record_id if record_id > 0 else None
+
+
+def _storage_error_response(exc):
+    return JsonResponse({'error': str(exc)}, status=500)
+
+
+def _method_not_allowed(allowed_methods):
+    return JsonResponse(
+        {'error': 'Method not allowed'},
+        status=405,
+        headers={'Allow': ', '.join(allowed_methods)},
+    )
 
 
 def reporters_view(request):
     if request.method == 'POST':
+        data, error_response = _json_body(request)
+        if error_response:
+            return error_response
+
         try:
-            data = json.loads(request.body)
-        except Exception:
-            return JsonResponse({'error': 'Invalid JSON'}, status=400)
-        try:
-            reporter = Reporter(data.get('id'), data.get('name'), data.get('email'), data.get('team'))
+            reporters = _load(REPORTERS_FILE)
+            reporter_id = data.get('id')
+            if reporter_id is None:
+                reporter_id = _next_id(reporters)
+            reporter = Reporter(reporter_id, data.get('name'), data.get('email'), data.get('team'))
             reporter.validate()
-        except ValueError as e:
-            return JsonResponse({'error': str(e)}, status=400)
-        arr = _load(REPORTERS_FILE)
-        arr.append(reporter.to_dict())
-        _save(REPORTERS_FILE, arr)
+            if any(record.get('id') == reporter.id for record in reporters):
+                return JsonResponse({'error': 'Reporter ID already exists'}, status=409)
+            reporters.append(reporter.to_dict())
+            _save(REPORTERS_FILE, reporters)
+        except ValueError as exc:
+            return JsonResponse({'error': str(exc)}, status=400)
+        except StorageError as exc:
+            return _storage_error_response(exc)
         return JsonResponse(reporter.to_dict(), status=201)
 
     if request.method == 'GET':
-        qid = request.GET.get('id')
-        arr = _load(REPORTERS_FILE)
-        if qid:
-            try:
-                rid = int(qid)
-            except ValueError:
+        try:
+            reporters = _load(REPORTERS_FILE)
+        except StorageError as exc:
+            return _storage_error_response(exc)
+        query_id = request.GET.get('id')
+        if query_id is not None:
+            reporter_id = _query_id(query_id)
+            if reporter_id is None:
                 return JsonResponse({'error': 'Invalid id'}, status=400)
-            for r in arr:
-                if r.get('id') == rid:
-                    return JsonResponse(r, status=200)
+            for reporter in reporters:
+                if reporter.get('id') == reporter_id:
+                    return JsonResponse(reporter, status=200)
             return JsonResponse({'error': 'Reporter not found'}, status=404)
-        return JsonResponse(arr, safe=False, status=200)
+        return JsonResponse(reporters, safe=False, status=200)
 
-    return HttpResponseNotAllowed(['GET', 'POST'])
+    return _method_not_allowed(['GET', 'POST'])
 
 
 def issues_view(request):
     if request.method == 'POST':
+        data, error_response = _json_body(request)
+        if error_response:
+            return error_response
+
         try:
-            data = json.loads(request.body)
-        except Exception:
-            return JsonResponse({'error': 'Invalid JSON'}, status=400)
-        priority = data.get('priority')
-        try:
-            if priority == 'critical':
-                issue = CriticalIssue(data.get('id'), data.get('title'), data.get('description'), data.get('status'), priority, data.get('reporter_id'))
-            elif priority == 'low':
-                issue = LowPriorityIssue(data.get('id'), data.get('title'), data.get('description'), data.get('status'), priority, data.get('reporter_id'))
-            else:
-                issue = Issue(data.get('id'), data.get('title'), data.get('description'), data.get('status'), priority, data.get('reporter_id'))
+            issues = _load(ISSUES_FILE)
+            reporters = _load(REPORTERS_FILE)
+            issue_id = data.get('id')
+            if issue_id is None:
+                issue_id = _next_id(issues)
+            priority = data.get('priority')
+            issue_type = priority if isinstance(priority, str) else None
+            issue_class = {
+                'critical': CriticalIssue,
+                'low': LowPriorityIssue,
+            }.get(issue_type, Issue)
+            issue = issue_class(
+                issue_id,
+                data.get('title'),
+                data.get('description', ''),
+                data.get('status'),
+                priority,
+                data.get('reporter_id'),
+                data.get('created_at'),
+            )
             issue.validate()
-        except ValueError as e:
-            return JsonResponse({'error': str(e)}, status=400)
-        arr = _load(ISSUES_FILE)
-        arr.append(issue.to_dict())
-        _save(ISSUES_FILE, arr)
+            if any(record.get('id') == issue.id for record in issues):
+                return JsonResponse({'error': 'Issue ID already exists'}, status=409)
+            if not any(record.get('id') == issue.reporter_id for record in reporters):
+                return JsonResponse({'error': 'Reporter not found'}, status=404)
+            issues.append(issue.to_dict())
+            _save(ISSUES_FILE, issues)
+        except ValueError as exc:
+            return JsonResponse({'error': str(exc)}, status=400)
+        except StorageError as exc:
+            return _storage_error_response(exc)
+
         response_data = issue.to_dict()
         response_data['message'] = issue.describe()
         return JsonResponse(response_data, status=201)
 
     if request.method == 'GET':
-        qid = request.GET.get('id')
-        qstatus = request.GET.get('status')
-        arr = _load(ISSUES_FILE)
-        if qid:
-            try:
-                iid = int(qid)
-            except ValueError:
-                return JsonResponse({'error': 'Invalid id'}, status=400)
-            for it in arr:
-                if it.get('id') == iid:
-                    return JsonResponse(it, status=200)
-            return JsonResponse({'error': 'Issue not found'}, status=404)
-        if qstatus:
-            filtered = [it for it in arr if it.get('status') == qstatus]
-            return JsonResponse(filtered, safe=False, status=200)
-        return JsonResponse(arr, safe=False, status=200)
+        try:
+            issues = _load(ISSUES_FILE)
+        except StorageError as exc:
+            return _storage_error_response(exc)
 
-    return HttpResponseNotAllowed(['GET', 'POST'])
+        query_id = request.GET.get('id')
+        if query_id is not None:
+            issue_id = _query_id(query_id)
+            if issue_id is None:
+                return JsonResponse({'error': 'Invalid id'}, status=400)
+            for issue in issues:
+                if issue.get('id') == issue_id:
+                    return JsonResponse(issue, status=200)
+            return JsonResponse({'error': 'Issue not found'}, status=404)
+
+        query_status = request.GET.get('status')
+        if query_status is not None:
+            if query_status not in Issue.ALLOWED_STATUSES:
+                return JsonResponse({'error': 'Invalid status'}, status=400)
+            issues = [issue for issue in issues if issue.get('status') == query_status]
+        return JsonResponse(issues, safe=False, status=200)
+
+    return _method_not_allowed(['GET', 'POST'])
