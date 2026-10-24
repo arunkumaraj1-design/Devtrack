@@ -1,5 +1,9 @@
 # DevTrack
 
+## EventHub assignment
+
+The separate EventHub Django REST Framework project is in [`eventhub/`](eventhub/README.md). Follow its README to install dependencies, migrate its SQLite database, run the API, and import its Postman collection.
+
 DevTrack is a small Django API for reporters to file engineering issues, assign priorities, and track status. It stores records in JSON files to keep the project easy to run without a database.
 
 ## Run locally

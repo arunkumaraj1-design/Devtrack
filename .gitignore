@@ -5,3 +5,4 @@ __pycache__/
 .DS_Store
 issues.json
 reporters.json
+**/db.sqlite3
