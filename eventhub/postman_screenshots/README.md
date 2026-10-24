@@ -1,7 +1,8 @@
-# Postman screenshots
+# API response captures
 
-Save the three required Postman Desktop response captures here after running the collection:
+These Postman CLI response captures use the request and response layout from the reference project. The reservation and cancellation show attendee `Arun` (`arun@example.com`). They are rendered captures, not screenshots of the Postman Desktop window.
 
-- `successful_reservation.png` — the “Reserve two seats” request with `201 Created`.
-- `overbooking_failure.png` — the “Overbooking fails” request with `400 Bad Request`.
-- `successful_cancellation.png` — the “Cancel reservation” request with `200 OK` and `status: cancelled`.
+- `successful_reservation.png` — reservation created (`201 Created`).
+- `overbooking_failure.png` — overbooking rejected (`400 Bad Request`).
+- `successful_cancellation.png` — reservation cancelled (`200 OK`).
+- `capture_source.html` — local rendering source.

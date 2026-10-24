@@ -46,3 +46,13 @@ postman collection run .\postman_collection.json --verbose
 ## Design decision
 
 Seat changes use conditional database updates inside transactions. A reservation only decrements the event when the event is still reservable and has enough seats at write time, so simultaneous requests cannot both claim the last seat. Cancellation changes the reservation status conditionally and restores seats in the same transaction, preventing duplicate cancellation requests from returning the same seats twice.
+
+## Response captures
+
+The captures show Postman CLI results in the reference request/response layout. They are rendered captures, not screenshots of the Postman Desktop window.
+
+![Successful reservation: 201 Created](postman_screenshots/successful_reservation.png)
+
+![Overbooking rejected: 400 Bad Request](postman_screenshots/overbooking_failure.png)
+
+![Successful cancellation: 200 OK](postman_screenshots/successful_cancellation.png)
